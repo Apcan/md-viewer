@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MD Viewer - 登录</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --bg: oklch(0.995 0.002 80);
+      --bg-card: oklch(0.975 0.005 80);
+      --text: oklch(0.17 0.02 260);
+      --text-secondary: oklch(0.48 0.015 260);
+      --accent: oklch(0.55 0.2 265);
+      --accent-hover: oklch(0.48 0.2 265);
+      --border: oklch(0.91 0.008 80);
+      --shadow: 0 1px 3px oklch(0.2 0 0 / 0.06), 0 1px 2px oklch(0.2 0 0 / 0.04);
+      --shadow-lg: 0 4px 12px oklch(0.2 0 0 / 0.08);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --success: oklch(0.65 0.17 155);
+      --danger: oklch(0.58 0.22 25);
+    }
+    html.dark {
+      --bg: oklch(0.15 0.015 260);
+      --bg-card: oklch(0.2 0.015 260);
+      --text: oklch(0.88 0.01 260);
+      --text-secondary: oklch(0.62 0.015 260);
+      --accent: oklch(0.7 0.15 265);
+      --accent-hover: oklch(0.6 0.18 265);
+      --border: oklch(0.28 0.015 260);
+      --shadow: 0 1px 3px oklch(0 0 0 / 0.3);
+      --shadow-lg: 0 4px 12px oklch(0 0 0 / 0.4);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      width: 100%;
+      max-width: 400px;
+      padding: 32px;
+    }
+    .card-title {
+      font-size: 20px;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 24px;
+      color: var(--text);
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .form-group input:focus {
+      border-color: var(--accent);
+    }
+    .form-group input::placeholder {
+      color: var(--text-secondary);
+      opacity: 0.6;
+    }
+    .error-msg {
+      display: none;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.2);
+      color: var(--danger);
+      font-size: 13px;
+      text-align: center;
+    }
+    .btn-login {
+      width: 100%;
+      padding: 10px 16px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: var(--accent);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-login:hover {
+      background: var(--accent-hover);
+    }
+    .btn-login:active {
+      transform: scale(0.98);
+    }
+    .btn-login:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .hint {
+      margin-top: 20px;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 12px;
+    }
+    .back-link {
+      display: block;
+      text-align: center;
+      margin-top: 20px;
+      color: var(--text-secondary);
+      font-size: 14px;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .back-link:hover {
+      color: var(--accent);
+    }
+    .navbar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .navbar-brand {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    .icon-btn:hover {
+      background: var(--bg-card);
+      color: var(--text);
+    }
+    @media (max-width: 600px) {
+      body { padding: 16px; padding-top: 72px; }
+      .card { padding: 24px 16px; }
+    }
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="navbar-brand">MD Viewer</a>
+    <button class="icon-btn" id="themeToggle" title="切换主题"></button>
+  </nav>
+
+  <div class="card">
+    <div class="card-title">登录 MD Viewer</div>
+
+    <form id="loginForm">
+      <div class="form-group">
+        <input type="password" id="password" placeholder="输入访问密码" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn-login" id="loginBtn">登录</button>
+    </form>
+
+    <div class="error-msg" id="errorMsg"></div>
+
+    <div class="hint">忘记密码？请联系管理员</div>
+  </div>
+
+  <script>
+    // --- Theme ---
+    const html = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+    function getTheme() {
+      const saved = localStorage.getItem('md-viewer-theme');
+      if (saved) return saved;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    function applyTheme(t) {
+      html.classList.toggle('dark', t === 'dark');
+      themeToggle.textContent = t === 'dark' ? '☀️' : '🌙';
+      localStorage.setItem('md-viewer-theme', t);
+    }
+    applyTheme(getTheme());
+    themeToggle.addEventListener('click', () => applyTheme(html.classList.contains('dark') ? 'light' : 'dark'));
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      if (!localStorage.getItem('md-viewer-theme')) applyTheme(e.matches ? 'dark' : 'light');
+    });
+
+    // --- Auto-login with saved password ---
+    (async function() {
+      try {
+        const res = await fetch('/api/auth/status');
+        const data = await res.json();
+        if (!data.required) {
+          window.location.href = '/';
+          return;
+        }
+        // Try auto-login with saved password
+        const savedPassword = localStorage.getItem('md-viewer-password');
+        if (savedPassword && !data.authenticated) {
+          const loginRes = await fetch('/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: savedPassword })
+          });
+          const loginData = await loginRes.json();
+          if (loginData.success) {
+            window.location.href = '/';
+            return;
+          }
+          // Saved password is wrong, clear it
+          localStorage.removeItem('md-viewer-password');
+        } else if (data.authenticated) {
+          window.location.href = '/';
+        }
+      } catch (e) {
+        // Stay on page and let user try
+      }
+    })();
+
+    // --- Login form ---
+    const form = document.getElementById('loginForm');
+    const passwordInput = document.getElementById('password');
+    const loginBtn = document.getElementById('loginBtn');
+    const errorMsg = document.getElementById('errorMsg');
+
+    function showError(msg) {
+      errorMsg.textContent = msg;
+      errorMsg.style.display = 'block';
+    }
+
+    function hideError() {
+      errorMsg.style.display = 'none';
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideError();
+
+      const password = passwordInput.value.trim();
+      if (!password) {
+        showError('请输入密码');
+        return;
+      }
+
+      loginBtn.disabled = true;
+      loginBtn.textContent = '登录中...';
+
+      try {
+        const res = await fetch('/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          // Save password to localStorage for auto-login
+          localStorage.setItem('md-viewer-password', password);
+          window.location.href = '/';
+        } else {
+          showError(data.error || '密码错误，请重试');
+          passwordInput.value = '';
+          passwordInput.focus();
+        }
+      } catch (err) {
+        showError('登录失败: ' + err.message);
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = '登录';
+      }
+    });
+
+    // Enter key already handled by form submit, but ensure focus on load
+    passwordInput.focus();
+  </script>
+</body>
+</html>

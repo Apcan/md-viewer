@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MD Viewer - 预览</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --bg: oklch(0.995 0.002 80);
+      --bg-card: oklch(1 0 0);
+      --text: oklch(0.17 0.02 260);
+      --text-secondary: oklch(0.48 0.015 260);
+      --accent: oklch(0.55 0.2 265);
+      --accent-hover: oklch(0.48 0.2 265);
+      --border: oklch(0.91 0.008 80);
+      --shadow: 0 1px 3px oklch(0.2 0 0 / 0.06);
+      --radius: 12px;
+      --code-bg: oklch(0.2 0.02 260);
+      --code-text: oklch(0.88 0.01 260);
+      --blockquote-border: oklch(0.7 0.15 265);
+    }
+    html.dark {
+      --bg: oklch(0.15 0.015 260);
+      --bg-card: oklch(0.2 0.015 260);
+      --text: oklch(0.88 0.01 260);
+      --text-secondary: oklch(0.62 0.015 260);
+      --accent: oklch(0.7 0.15 265);
+      --accent-hover: oklch(0.6 0.18 265);
+      --border: oklch(0.28 0.015 260);
+      --shadow: 0 1px 3px oklch(0 0 0 / 0.3);
+      --code-bg: oklch(0.13 0.015 260);
+      --code-text: oklch(0.88 0.01 260);
+      --blockquote-border: oklch(0.6 0.18 265);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      transition: background 0.2s, color 0.2s;
+    }
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      height: 56px;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .header-content {
+      max-width: 800px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 13px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+      min-height: 36px;
+    }
+    .back-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .doc-title {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .header-actions {
+      display: flex;
+      gap: 4px;
+    }
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .icon-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .theme-float {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 200;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-lg);
+      font-size: 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 32px 20px 60px;
+    }
+    .markdown-body {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px;
+      line-height: 1.8;
+      color: var(--text);
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .markdown-body h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin: 0 0 24px 0;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      letter-spacing: -0.3px;
+    }
+    .markdown-body h2 {
+      font-size: 22px;
+      font-weight: 600;
+      margin: 32px 0 16px 0;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .markdown-body h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 24px 0 12px 0;
+    }
+    .markdown-body h4 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 20px 0 8px 0;
+    }
+    .markdown-body p {
+      margin: 0 0 16px 0;
+    }
+    .markdown-body ul, .markdown-body ol {
+      margin: 0 0 16px 0;
+      padding-left: 24px;
+    }
+    .markdown-body li {
+      margin: 6px 0;
+    }
+    .markdown-body code {
+      background: rgba(99,102,241,0.08);
+      color: var(--accent);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+      font-size: 0.9em;
+    }
+    .markdown-body pre {
+      background: var(--code-bg);
+      color: var(--code-text);
+      padding: 20px;
+      border-radius: var(--radius-sm);
+      overflow-x: auto;
+      margin: 0 0 20px 0;
+      line-height: 1.6;
+    }
+    .markdown-body pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+      font-size: 13px;
+    }
+    .markdown-body blockquote {
+      border-left: 3px solid var(--blockquote-border);
+      padding: 8px 16px;
+      margin: 0 0 16px 0;
+      color: var(--text-secondary);
+      background: rgba(99,102,241,0.04);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    }
+    .markdown-body blockquote p:last-child { margin-bottom: 0; }
+    .markdown-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0 0 16px 0;
+      font-size: 14px;
+    }
+    .markdown-body th, .markdown-body td {
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      text-align: left;
+    }
+    .markdown-body th {
+      background: var(--bg-card);
+      font-weight: 600;
+    }
+    .markdown-body img {
+      max-width: 100%;
+      height: auto;
+      border-radius: var(--radius-sm);
+    }
+    .markdown-body a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .markdown-body a:hover {
+      text-decoration: underline;
+    }
+    .markdown-body hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 24px 0;
+    }
+    .markdown-body input[type="checkbox"] {
+      margin-right: 6px;
+      accent-color: var(--accent);
+    }
+    .loading, .error {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-secondary);
+    }
+    .error { color: var(--danger, #ef4444); }
+    /* Skeleton */
+    .sk-wrap { padding: 0; }
+    .sk-block {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px;
+    }
+    .sk-line { height: 14px; border-radius: 7px; background: var(--border); margin-bottom: 14px; animation: skP 1.5s ease-in-out infinite; }
+    .sk-line.w50 { width: 50%; }
+    .sk-line.w70 { width: 70%; }
+    .sk-line.w90 { width: 90%; }
+    .sk-line.h20 { height: 20px; margin-bottom: 20px; width: 40%; }
+    .sk-gap { height: 24px; }
+    @keyframes skP { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    @media (max-width: 600px) {
+      .container { padding: 16px 12px 40px; }
+      .markdown-body { padding: 20px 16px; }
+      .markdown-body h1 { font-size: 22px; }
+      .markdown-body h2 { font-size: 18px; }
+      .markdown-body h3 { font-size: 16px; }
+      .markdown-body pre { padding: 14px; font-size: 12px; }
+      .doc-title { font-size: 13px; }
+    }
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* --- Reading progress bar --- */
+    .reading-progress {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 0%;
+      height: 3px;
+      background: var(--accent);
+      z-index: 9999;
+      transition: width 0.1s linear;
+      border-radius: 0 2px 2px 0;
+    }
+    /* --- Password overlay --- */
+    .password-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      background: var(--bg);
+    }
+    .password-overlay.hidden { display: none; }
+    .password-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      width: 100%;
+      max-width: 400px;
+      padding: 32px;
+    }
+    .password-card-title {
+      font-size: 18px;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+    .password-card-icon {
+      text-align: center;
+      font-size: 40px;
+      margin-bottom: 16px;
+    }
+    .password-card-hint {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+    }
+    .password-card .form-group {
+      margin-bottom: 16px;
+    }
+    .password-card .form-group input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .password-card .form-group input:focus {
+      border-color: var(--accent);
+    }
+    .password-card .form-group input::placeholder {
+      color: var(--text-secondary);
+      opacity: 0.6;
+    }
+    .password-card .btn-submit {
+      width: 100%;
+      padding: 10px 16px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: var(--accent);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .password-card .btn-submit:hover {
+      background: var(--accent-hover);
+    }
+    .password-card .btn-submit:active {
+      transform: scale(0.98);
+    }
+    .password-card .btn-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .password-error {
+      display: none;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.2);
+      color: var(--danger, #ef4444);
+      font-size: 13px;
+      text-align: center;
+    }
+    /* --- Header toolbar buttons --- */
+    .header-actions .icon-btn { font-size: 15px; }
+
+    /* --- TOC sidebar --- */
+    .toc-sidebar {
+      position: fixed;
+      top: 56px;
+      right: 0;
+      width: 220px;
+      height: calc(100vh - 56px);
+      overflow-y: auto;
+      padding: 20px 16px;
+      font-size: 13px;
+      border-left: 1px solid var(--border);
+      background: var(--bg);
+      z-index: 50;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .toc-sidebar::-webkit-scrollbar { width: 4px; }
+    .toc-sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .toc-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+    .toc-list { list-style: none; }
+    .toc-item {
+      display: block;
+      padding: 4px 0 4px 0;
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color 0.15s;
+      line-height: 1.4;
+      border-left: 2px solid transparent;
+      padding-left: 8px;
+      margin-left: 0;
+    }
+    .toc-item:hover { color: var(--text); }
+    .toc-item.active {
+      color: var(--accent);
+      border-left-color: var(--accent);
+      font-weight: 500;
+    }
+    .toc-item.depth-3 { padding-left: 20px; font-size: 12px; }
+    .toc-empty {
+      color: var(--text-secondary);
+      opacity: 0.6;
+      font-size: 12px;
+    }
+
+    /* --- TOC mobile toggle --- */
+    .toc-mobile-toggle {
+      display: none;
+      position: fixed;
+      bottom: 72px;
+      right: 20px;
+      z-index: 200;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      font-size: 18px;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+    }
+    .toc-mobile-panel {
+      display: none;
+      position: fixed;
+      top: 56px;
+      left: 0;
+      right: 0;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      z-index: 90;
+      max-height: 50vh;
+      overflow-y: auto;
+      padding: 16px 20px;
+    }
+
+    /* --- Serif headings --- */
+    .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+      font-family: 'Noto Serif SC', 'Songti SC', Georgia, serif;
+    }
+
+    /* --- Code block language label --- */
+    .markdown-body pre {
+      position: relative;
+    }
+    .markdown-body pre::before {
+      content: attr(data-lang);
+      position: absolute;
+      top: 8px;
+      right: 12px;
+      font-size: 11px;
+      color: oklch(0.65 0.05 260);
+      opacity: 0.6;
+      pointer-events: none;
+      text-transform: uppercase;
+      font-family: var(--font-sans);
+    }
+
+    /* --- Table zebra stripes --- */
+    .markdown-body table tr:nth-child(even) {
+      background: oklch(0.5 0 0 / 0.03);
+    }
+    html.dark .markdown-body table tr:nth-child(even) {
+      background: oklch(1 0 0 / 0.03);
+    }
+
+    /* --- Image lightbox --- */
+    .markdown-body img {
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .markdown-body img:hover {
+      transform: scale(1.02);
+    }
+    .lightbox-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: zoom-out;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+    }
+    .lightbox-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+    .lightbox-overlay img {
+      max-width: 90vw;
+      max-height: 90vh;
+      border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      cursor: default;
+    }
+
+    /* --- Responsive TOC --- */
+    @media (max-width: 1100px) {
+      .toc-sidebar { display: none; }
+      .toc-mobile-toggle { display: flex; }
+      .toc-mobile-panel.show { display: block; }
+      .container { max-width: 100%; padding-right: 20px; }
+    }
+    @media (max-width: 600px) {
+      .toc-mobile-panel { padding: 12px 16px; }
+    }
+
+    /* --- Print enhancements --- */
+    @media print {
+      .header, .theme-float, .toc-sidebar, .toc-mobile-toggle { display: none !important; }
+      .markdown-body { border: none; box-shadow: none; padding: 0; max-width: 100%; }
+      .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+        font-family: 'Noto Serif SC', Georgia, serif;
+        break-after: avoid;
+      }
+      .markdown-body pre { break-inside: avoid; }
+      .markdown-body table { break-inside: avoid; }
+      .markdown-body img { max-width: 100% !important; }
+      body { background: white; color: black; }
+      .container { padding: 0; max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="reading-progress" id="readingProgress"></div>
+
+  <div class="header" id="header">
+    <div class="header-content">
+      <a href="/" class="back-btn">← 返回</a>
+      <div class="doc-title" id="docTitle">加载中...</div>
+      <div class="header-actions">
+        <button class="icon-btn" id="exportHtmlBtn" title="导出 HTML">⬇</button>
+        <button class="icon-btn" id="printBtn" title="打印">🖨</button>
+      </div>
+    </div>
+  </div>
+  <button class="icon-btn theme-float" id="themeToggle" title="切换主题"></button>
+
+  <!-- Password overlay -->
+  <div class="password-overlay hidden" id="passwordOverlay">
+    <div class="password-card">
+      <div class="password-card-icon">🔑</div>
+      <div class="password-card-title">此文档需要密码查看</div>
+      <div class="password-card-hint">请输入查看密码以访问文档内容</div>
+      <form id="passwordForm">
+        <div class="form-group">
+          <input type="password" id="viewPasswordInput" placeholder="输入查看密码" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn-submit" id="passwordSubmitBtn">验证密码</button>
+      </form>
+      <div class="password-error" id="passwordError"></div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="markdown-body sk-wrap" id="content">
+      <div class="sk-block">
+        <div class="sk-line h20"></div>
+        <div class="sk-line w90"></div>
+        <div class="sk-line w70"></div>
+        <div class="sk-line w90"></div>
+        <div class="sk-gap"></div>
+        <div class="sk-line w90"></div>
+        <div class="sk-line w50"></div>
+        <div class="sk-gap"></div>
+        <div class="sk-line w70"></div>
+        <div class="sk-line w90"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOC sidebar -->
+  <aside class="toc-sidebar" id="tocSidebar">
+    <div class="toc-title">目录</div>
+    <ul class="toc-list" id="tocList"></ul>
+  </aside>
+  <button class="toc-mobile-toggle" id="tocMobileToggle">📑</button>
+  <div class="toc-mobile-panel" id="tocMobilePanel">
+    <ul class="toc-list" id="tocMobileList"></ul>
+  </div>
+
+  <!-- Lightbox -->
+  <div class="lightbox-overlay" id="lightbox">
+    <img id="lightboxImg" src="" alt="">
+  </div>
+
+  <script>
+    // --- Theme ---
+    const html = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+    function getTheme() {
+      const saved = localStorage.getItem('md-viewer-theme');
+      if (saved) return saved;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    function applyTheme(t) {
+      html.classList.toggle('dark', t === 'dark');
+      themeToggle.textContent = t === 'dark' ? '☀️' : '🌙';
+      localStorage.setItem('md-viewer-theme', t);
+    }
+    applyTheme(getTheme());
+    themeToggle.addEventListener('click', () => applyTheme(html.classList.contains('dark') ? 'light' : 'dark'));
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      if (!localStorage.getItem('md-viewer-theme')) applyTheme(e.matches ? 'dark' : 'light');
+    });
+
+    // --- Load document ---
+    let currentDocId = null;
+
+    async function loadDocument(docPassword) {
+      currentDocId = window.location.pathname.split('/').pop();
+      const content = document.getElementById('content');
+      const title = document.getElementById('docTitle');
+      const header = document.getElementById('header');
+      const passwordOverlay = document.getElementById('passwordOverlay');
+
+      const fromList = document.referrer &&
+        document.referrer.includes(window.location.origin) &&
+        (document.referrer.endsWith('/') || document.referrer.includes('/?'));
+
+      if (!fromList) header.style.display = 'none';
+
+      try {
+        const fetchHeaders = {};
+        if (docPassword) fetchHeaders['X-View-Password'] = docPassword;
+
+        const res = await fetch('/api/documents/' + currentDocId, { headers: fetchHeaders });
+        const data = await res.json();
+
+        // 401 + requireAuth → redirect to login
+        if (res.status === 401 && data.requireAuth) {
+          window.location.href = '/login';
+          return;
+        }
+
+        // 403 + requirePassword → show password card, hide skeleton
+        if (res.status === 403 && data.requirePassword) {
+          content.classList.remove('sk-wrap');
+          content.innerHTML = '';
+          passwordOverlay.classList.remove('hidden');
+          title.textContent = '需要密码';
+          return;
+        }
+
+        if (data.error) {
+          content.innerHTML = '<div class="error">' + data.error + '</div>';
+          title.textContent = '加载失败';
+          return;
+        }
+        document.title = data.original_name + ' - MD Viewer';
+        title.textContent = data.original_name;
+        content.classList.remove('sk-wrap');
+        content.innerHTML = data.html;
+      } catch (err) {
+        content.innerHTML = '<div class="error">加载失败: ' + err.message + '</div>';
+        title.textContent = '加载失败';
+      }
+    }
+    loadDocument();
+
+    // --- Password form submit ---
+    const passwordForm = document.getElementById('passwordForm');
+    const viewPasswordInput = document.getElementById('viewPasswordInput');
+    const passwordSubmitBtn = document.getElementById('passwordSubmitBtn');
+    const passwordError = document.getElementById('passwordError');
+
+    passwordForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      passwordError.style.display = 'none';
+
+      const pwd = viewPasswordInput.value.trim();
+      if (!pwd) return;
+
+      passwordSubmitBtn.disabled = true;
+      passwordSubmitBtn.textContent = '验证中...';
+
+      try {
+        const res = await fetch('/api/documents/' + currentDocId, {
+          headers: { 'X-View-Password': pwd }
+        });
+        const data = await res.json();
+
+        if (res.status === 403 && data.requirePassword) {
+          passwordError.textContent = '密码错误，请重试';
+          passwordError.style.display = 'block';
+          viewPasswordInput.value = '';
+          viewPasswordInput.focus();
+        } else if (data.error) {
+          passwordError.textContent = data.error;
+          passwordError.style.display = 'block';
+        } else {
+          // Success: hide overlay, show document
+          document.getElementById('passwordOverlay').classList.add('hidden');
+          document.title = data.original_name + ' - MD Viewer';
+          document.getElementById('docTitle').textContent = data.original_name;
+          document.getElementById('content').classList.remove('sk-wrap');
+          document.getElementById('content').innerHTML = data.html;
+        }
+      } catch (err) {
+        passwordError.textContent = '验证失败: ' + err.message;
+        passwordError.style.display = 'block';
+      } finally {
+        passwordSubmitBtn.disabled = false;
+        passwordSubmitBtn.textContent = '验证密码';
+      }
+    });
+
+    // --- Export HTML ---
+    document.getElementById('exportHtmlBtn').addEventListener('click', () => {
+      const content = document.getElementById('content');
+      const title = document.getElementById('docTitle').textContent;
+      const styles = document.querySelector('style').textContent;
+      const fullHtml = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(title)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+<style>${styles}</style>
+</head>
+<body>
+<div style="max-width:800px;margin:0 auto;padding:32px 20px;">
+<div class="markdown-body">${content.innerHTML}</div>
+</div>
+</body>
+</html>`;
+      const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (title || 'document') + '.html';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // --- Print ---
+    document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+    // --- TOC generation ---
+    function generateTOC() {
+      const content = document.getElementById('content');
+      const headings = content.querySelectorAll('h2, h3');
+      if (headings.length === 0) return;
+
+      const tocList = document.getElementById('tocList');
+      const tocMobileList = document.getElementById('tocMobileList');
+      let html = '';
+      headings.forEach((h, i) => {
+        const id = 'toc-heading-' + i;
+        h.id = id;
+        const depth = h.tagName === 'H3' ? ' depth-3' : '';
+        html += '<li><a class="toc-item' + depth + '" href="#' + id + '" data-target="' + id + '">' + escapeHtml(h.textContent) + '</a></li>';
+      });
+      tocList.innerHTML = html;
+      tocMobileList.innerHTML = html;
+
+      // IntersectionObserver for active highlighting
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const id = entry.target.id;
+            document.querySelectorAll('.toc-item').forEach(item => {
+              item.classList.toggle('active', item.dataset.target === id);
+            });
+          }
+        });
+      }, { rootMargin: '-80px 0px -70% 0px', threshold: 0 });
+
+      headings.forEach(h => observer.observe(h));
+
+      // Smooth scroll for TOC links
+      document.querySelectorAll('.toc-item').forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const target = document.getElementById(link.dataset.target);
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Close mobile panel
+            document.getElementById('tocMobilePanel').classList.remove('show');
+          }
+        });
+      });
+    }
+
+    // Call TOC after content loads (watch for innerHTML change)
+    const contentEl = document.getElementById('content');
+    const tocObserver = new MutationObserver(() => {
+      if (!contentEl.classList.contains('sk-wrap') && contentEl.innerHTML.trim()) {
+        generateTOC();
+        tocObserver.disconnect();
+      }
+    });
+    tocObserver.observe(contentEl, { childList: true, subtree: true });
+
+    // --- TOC mobile toggle ---
+    document.getElementById('tocMobileToggle').addEventListener('click', () => {
+      document.getElementById('tocMobilePanel').classList.toggle('show');
+    });
+
+    // --- Image lightbox ---
+    const lightbox = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightboxImg');
+
+    document.addEventListener('click', (e) => {
+      if (e.target.tagName === 'IMG' && e.target.closest('.markdown-body')) {
+        lightboxImg.src = e.target.src;
+        lightboxImg.alt = e.target.alt;
+        lightbox.classList.add('active');
+      }
+    });
+
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox || e.target === lightboxImg) {
+        lightbox.classList.remove('active');
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') lightbox.classList.remove('active');
+    });
+
+    // --- Code block language labels ---
+    function addCodeLangLabels() {
+      document.querySelectorAll('.markdown-body pre code').forEach(code => {
+        const pre = code.parentElement;
+        const langMatch = code.className.match(/language-(\w+)/);
+        if (langMatch) {
+          pre.setAttribute('data-lang', langMatch[1]);
+        }
+      });
+    }
+    // Observe content changes to add labels
+    const langLabelObserver = new MutationObserver(() => {
+      if (!contentEl.classList.contains('sk-wrap')) {
+        addCodeLangLabels();
+      }
+    });
+    langLabelObserver.observe(contentEl, { childList: true, subtree: true });
+
+    function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+    // --- Reading progress bar ---
+    const readingProgress = document.getElementById('readingProgress');
+    window.addEventListener('scroll', () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const progress = docHeight > 0 ? Math.min((scrollTop / docHeight) * 100, 100) : 0;
+      readingProgress.style.width = progress + '%';
+    }, { passive: true });
+  </script>
+</body>
+</html>

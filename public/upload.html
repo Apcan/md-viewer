@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MD Viewer - 上传文档</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --bg: oklch(0.995 0.002 80);
+      --bg-card: oklch(0.975 0.005 80);
+      --text: oklch(0.17 0.02 260);
+      --text-secondary: oklch(0.48 0.015 260);
+      --accent: oklch(0.55 0.2 265);
+      --accent-hover: oklch(0.48 0.2 265);
+      --border: oklch(0.91 0.008 80);
+      --shadow: 0 1px 3px oklch(0.2 0 0 / 0.06), 0 1px 2px oklch(0.2 0 0 / 0.04);
+      --shadow-lg: 0 4px 12px oklch(0.2 0 0 / 0.08);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --success: oklch(0.65 0.17 155);
+      --danger: oklch(0.58 0.22 25);
+    }
+    html.dark {
+      --bg: oklch(0.15 0.015 260);
+      --bg-card: oklch(0.2 0.015 260);
+      --text: oklch(0.88 0.01 260);
+      --text-secondary: oklch(0.62 0.015 260);
+      --accent: oklch(0.7 0.15 265);
+      --accent-hover: oklch(0.6 0.18 265);
+      --border: oklch(0.28 0.015 260);
+      --shadow: 0 1px 3px oklch(0 0 0 / 0.3);
+      --shadow-lg: 0 4px 12px oklch(0 0 0 / 0.4);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      width: 100%;
+      max-width: 520px;
+      padding: 32px;
+    }
+    .card-title {
+      font-size: 20px;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 24px;
+      color: var(--text);
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    .form-group select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .form-group select:focus {
+      border-color: var(--accent);
+    }
+    .form-group input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .form-group input:focus {
+      border-color: var(--accent);
+    }
+    .form-group input::placeholder {
+      color: var(--text-secondary);
+      opacity: 0.6;
+    }
+    .form-group textarea:focus { border-color: var(--accent); }
+    .form-group textarea::placeholder { color: var(--text-secondary); opacity: 0.6; }
+    .permission-options {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .perm-option {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .perm-option:has(input:checked) {
+      border-color: var(--accent);
+      background: rgba(99,102,241,0.05);
+      color: var(--accent);
+      font-weight: 500;
+    }
+    .perm-option input {
+      display: none;
+    }
+    #permPasswordWrap {
+      display: none;
+      margin-bottom: 16px;
+    }
+    .upload-area {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 48px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .upload-area:hover, .upload-area.dragover {
+      border-color: var(--accent);
+      background: rgba(99,102,241,0.04);
+    }
+    .upload-area input { display: none; }
+    .upload-icon { font-size: 48px; margin-bottom: 12px; }
+    .upload-text { color: var(--text-secondary); font-size: 15px; }
+    .upload-hint { color: var(--text-secondary); font-size: 12px; margin-top: 8px; opacity: 0.7; }
+
+    .result-card {
+      display: none;
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: var(--radius);
+      text-align: center;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .result-card.success {
+      display: block;
+      background: rgba(16,185,129,0.08);
+      border: 1px solid rgba(16,185,129,0.2);
+      color: var(--success);
+    }
+    .result-card.error {
+      display: block;
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.2);
+      color: var(--danger);
+    }
+    .result-card a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .result-card a:hover {
+      text-decoration: underline;
+    }
+    .back-link {
+      display: block;
+      text-align: center;
+      margin-top: 20px;
+      color: var(--text-secondary);
+      font-size: 14px;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .back-link:hover {
+      color: var(--accent);
+    }
+    .navbar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .navbar-brand {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    .icon-btn:hover {
+      background: var(--bg-card);
+      color: var(--text);
+    }
+    @media (max-width: 600px) {
+      body { padding: 16px; padding-top: 72px; }
+      .card { padding: 24px 16px; }
+      .upload-area { padding: 36px 16px; }
+    }
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <a href="/" class="navbar-brand">MD Viewer</a>
+    <button class="icon-btn" id="themeToggle" title="切换主题"></button>
+  </nav>
+
+  <div class="card">
+    <div class="card-title">上传 Markdown 文档</div>
+
+    <div class="form-group">
+      <label for="categorySelect">选择分类</label>
+      <select id="categorySelect">
+        <option value="">未分类</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="docDescription">文档备注</label>
+      <textarea id="docDescription" placeholder="添加备注信息（可选）" rows="2" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-size:14px;font-family:var(--font-sans);outline:none;resize:vertical;transition:border-color 0.15s;"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>查看权限</label>
+      <div class="permission-options">
+        <label class="perm-option">
+          <input type="radio" name="viewPermission" value="public" checked>
+          🌐 公开
+        </label>
+        <label class="perm-option">
+          <input type="radio" name="viewPermission" value="private">
+          🔒 私有
+        </label>
+        <label class="perm-option">
+          <input type="radio" name="viewPermission" value="password">
+          🔑 密码查看
+        </label>
+      </div>
+    </div>
+
+    <div id="permPasswordWrap" class="form-group">
+      <label for="viewPassword">查看密码</label>
+      <input type="password" id="viewPassword" placeholder="输入查看密码">
+    </div>
+
+    <div class="upload-area" id="uploadArea">
+      <input type="file" id="fileInput" accept=".md">
+      <div class="upload-icon">📄</div>
+      <div class="upload-text">点击或拖拽文件到此处</div>
+      <div class="upload-hint">仅支持 .md 文件，最大 10MB</div>
+    </div>
+
+    <div class="result-card" id="result"></div>
+  </div>
+
+  <a href="/" class="back-link">返回文档列表</a>
+
+  <script>
+    // --- Theme ---
+    const html = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+    function getTheme() {
+      const saved = localStorage.getItem('md-viewer-theme');
+      if (saved) return saved;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    function applyTheme(t) {
+      html.classList.toggle('dark', t === 'dark');
+      themeToggle.textContent = t === 'dark' ? '☀️' : '🌙';
+      localStorage.setItem('md-viewer-theme', t);
+    }
+    applyTheme(getTheme());
+    themeToggle.addEventListener('click', () => applyTheme(html.classList.contains('dark') ? 'light' : 'dark'));
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      if (!localStorage.getItem('md-viewer-theme')) applyTheme(e.matches ? 'dark' : 'light');
+    });
+
+    // --- Categories ---
+    async function loadCategories() {
+      try {
+        const res = await fetch('/api/categories');
+        const cats = await res.json();
+        const sel = document.getElementById('categorySelect');
+        sel.innerHTML = '<option value="">未分类</option>' +
+          cats.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+      } catch (e) { /* ignore */ }
+    }
+    loadCategories();
+
+    // --- Upload ---
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const result = document.getElementById('result');
+    const categorySelect = document.getElementById('categorySelect');
+    const permPasswordWrap = document.getElementById('permPasswordWrap');
+    const viewPassword = document.getElementById('viewPassword');
+
+    // Permission radio change: show/hide password input
+    document.querySelectorAll('input[name="viewPermission"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        permPasswordWrap.style.display = radio.value === 'password' && radio.checked ? 'block' : 'none';
+      });
+    });
+
+    async function uploadFile(file) {
+      if (!file.name.endsWith('.md')) {
+        result.className = 'result-card error';
+        result.textContent = '只支持 .md 文件';
+        return;
+      }
+      const formData = new FormData();
+      formData.append('file', file);
+      const catId = categorySelect.value;
+      if (catId) formData.append('category_id', catId);
+
+      const docDesc = document.getElementById('docDescription').value.trim();
+      if (docDesc) formData.append('description', docDesc);
+
+      const permValue = document.querySelector('input[name="viewPermission"]:checked').value;
+      formData.append('view_permission', permValue);
+      if (permValue === 'password' && viewPassword.value.trim()) {
+        formData.append('view_password', viewPassword.value.trim());
+      }
+
+      result.className = 'result-card';
+      result.textContent = '上传中...';
+      result.style.display = 'block';
+      result.className = 'result-card success';
+
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        if (res.status === 401) { window.location.href = '/login'; return; }
+        const data = await res.json();
+        if (data.success) {
+          result.className = 'result-card success';
+          result.innerHTML = `上传成功！<br>文件: ${escapeHtml(data.filename)}<br>大小: ${formatSize(data.size)}<br><br><a href="/view/${data.id}" target="_blank">点击查看</a>`;
+          fileInput.value = '';
+        } else {
+          result.className = 'result-card error';
+          result.textContent = '上传失败: ' + data.error;
+        }
+      } catch (err) {
+        result.className = 'result-card error';
+        result.textContent = '上传失败: ' + err.message;
+      }
+    }
+
+    function formatSize(b) {
+      if (b < 1024) return b + ' B';
+      if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+      return (b / 1048576).toFixed(1) + ' MB';
+    }
+    function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+    uploadArea.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => { if (e.target.files[0]) uploadFile(e.target.files[0]); });
+    uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+
+# Build output
+data/
+# Database
+# Data (runtime generated)
+*.db
+# Dependencies
+dist/
+.DS_Store
+.env
+.env.*
+# Environment
+.hermes/
+# IDE
+.idea/
+*.log
+logs/
+# Logs
+migrate-v2.sql
+node_modules/
+# OS
+*.sqlite3
+*.swo
+*.swp
+test.md
+Thumbs.db
+.vscode/
