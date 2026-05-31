@@ -182,6 +182,7 @@ const authMiddleware = (req, res, next) => {
   // Public prefix whitelist (GET only for categories, documents/:id)
   if (req.path === '/api/categories' && req.method === 'GET') return next();
   if (/^\/api\/documents\/[^/]+$/.test(req.path) && req.method === 'GET') return next();
+  if (/^\/api\/documents\/[^/]+\/versions(\/[^/]+)?$/.test(req.path) && req.method === 'GET') return next();
   if (PUBLIC_PREFIXES.some(p => req.path.startsWith(p))) return next();
 
   // Allow static files served by express.static (but they are handled above by extension check)
@@ -282,17 +283,12 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
 
       const newVersion = (existingDoc.version || 1) + 1;
 
-      // Save current version to document_versions
+      // Save current version to document_versions (keep old file on disk for history)
       const versionId = uuidv4();
       db.prepare(`
         INSERT INTO document_versions (id, document_id, version, file_path, file_size, filename, created_at)
         VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `).run(versionId, replaceDocumentId, existingDoc.version || 1, existingDoc.file_path, existingDoc.file_size, existingDoc.filename);
-
-      // Delete old file
-      if (fs.existsSync(existingDoc.file_path)) {
-        fs.unlinkSync(existingDoc.file_path);
-      }
 
       // Update document with new file info
       db.prepare(`
@@ -318,8 +314,8 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
     const description = req.body.description || null;
 
     const stmt = db.prepare(`
-      INSERT INTO documents (id, filename, original_name, file_path, file_size, category_id, view_permission, view_password, description)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO documents (id, filename, original_name, file_path, file_size, category_id, view_permission, view_password, description, version)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     `);
 
     stmt.run(
@@ -383,8 +379,8 @@ app.get('/api/documents/:id/versions', (req, res) => {
     const currentVersion = {
       id: doc.id,
       version: doc.version || 1,
-      file_size: null,
-      filename: null,
+      file_size: doc.file_size,
+      filename: doc.original_name,
       created_at: doc.created_at,
       is_current: true
     };
@@ -482,8 +478,14 @@ app.get('/api/documents', (req, res) => {
           const [id, name, color] = tag.split('|');
           return { id, name, color };
         }) : [];
-        const word_count = Math.round((doc.file_size || 0) / 2);
-        const reading_time = Math.ceil(word_count / 400);
+        let word_count = 0, reading_time = 1;
+        try {
+          if (file_path && fs.existsSync(file_path)) {
+            const content = fs.readFileSync(file_path, 'utf-8');
+            word_count = countWords(content);
+            reading_time = Math.ceil(word_count / 400);
+          }
+        } catch (e) { /* ignore read errors */ }
         return { ...rest, word_count, reading_time, tags };
       }));
     } else if (category_id) {
@@ -503,8 +505,14 @@ app.get('/api/documents', (req, res) => {
           const [id, name, color] = tag.split('|');
           return { id, name, color };
         }) : [];
-        const word_count = Math.round((doc.file_size || 0) / 2);
-        const reading_time = Math.ceil(word_count / 400);
+        let word_count = 0, reading_time = 1;
+        try {
+          if (file_path && fs.existsSync(file_path)) {
+            const content = fs.readFileSync(file_path, 'utf-8');
+            word_count = countWords(content);
+            reading_time = Math.ceil(word_count / 400);
+          }
+        } catch (e) { /* ignore read errors */ }
         return { ...rest, word_count, reading_time, tags };
       }));
     } else if (tag_id) {
@@ -524,8 +532,14 @@ app.get('/api/documents', (req, res) => {
           const [id, name, color] = tag.split('|');
           return { id, name, color };
         }) : [];
-        const word_count = Math.round((doc.file_size || 0) / 2);
-        const reading_time = Math.ceil(word_count / 400);
+        let word_count = 0, reading_time = 1;
+        try {
+          if (file_path && fs.existsSync(file_path)) {
+            const content = fs.readFileSync(file_path, 'utf-8');
+            word_count = countWords(content);
+            reading_time = Math.ceil(word_count / 400);
+          }
+        } catch (e) { /* ignore read errors */ }
         return { ...rest, word_count, reading_time, tags };
       }));
     } else {
@@ -1312,14 +1326,12 @@ app.post('/mcp', (req, res) => {
               return res.json({ jsonrpc: '2.0', id, error: { code: -32000, message: 'Document not found' } });
             }
             const newVersion = (existingDoc.version || 1) + 1;
-            // Save current version to history
+            // Save current version to history (keep old file on disk)
             const versionId = uuidv4();
             db.prepare(`
               INSERT INTO document_versions (id, document_id, version, file_path, file_size, filename, created_at)
               VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             `).run(versionId, replace_document_id, existingDoc.version || 1, existingDoc.file_path, existingDoc.file_size, existingDoc.filename);
-            // Delete old file
-            if (fs.existsSync(existingDoc.file_path)) fs.unlinkSync(existingDoc.file_path);
             // Update document
             db.prepare(`
               UPDATE documents SET file_path = ?, file_size = ?, filename = ?, version = ?, updated_at = CURRENT_TIMESTAMP
@@ -1329,7 +1341,7 @@ app.post('/mcp', (req, res) => {
           } else {
             const docId = uuidv4();
             db.prepare(
-              'INSERT INTO documents (id, filename, original_name, file_path, file_size, category_id) VALUES (?, ?, ?, ?, ?, ?)'
+              'INSERT INTO documents (id, filename, original_name, file_path, file_size, category_id, version) VALUES (?, ?, ?, ?, ?, ?, 1)'
             ).run(docId, safeFilename, filename, filePath, Buffer.byteLength(content), category_id || null);
             result = { content: [{ type: 'text', text: JSON.stringify({ success: true, id: docId, filename }, null, 2) }] };
           }
@@ -1341,7 +1353,14 @@ app.post('/mcp', (req, res) => {
           if (!doc) {
             return res.json({ jsonrpc: '2.0', id, error: { code: -32000, message: 'Document not found' } });
           }
+          // Delete version files
+          const versions = db.prepare('SELECT file_path FROM document_versions WHERE document_id = ?').all(args.id);
+          for (const v of versions) {
+            if (v.file_path && fs.existsSync(v.file_path)) fs.unlinkSync(v.file_path);
+          }
           if (fs.existsSync(doc.file_path)) fs.unlinkSync(doc.file_path);
+          db.prepare('DELETE FROM document_tags WHERE document_id = ?').run(args.id);
+          db.prepare('DELETE FROM document_versions WHERE document_id = ?').run(args.id);
           db.prepare('DELETE FROM documents WHERE id = ?').run(args.id);
           result = { content: [{ type: 'text', text: JSON.stringify({ success: true }) }] };
           break;
