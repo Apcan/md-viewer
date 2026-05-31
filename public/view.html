@@ -809,6 +809,7 @@
     // --- Load document ---
     let currentDocId = null;
     let currentDocVersion = 1;
+    let viewingVersion = 1;
 
     async function loadDocument(docPassword) {
       currentDocId = window.location.pathname.split('/').pop();
@@ -861,6 +862,7 @@
 
         // Show version badge
         currentDocVersion = data.version || 1;
+        viewingVersion = currentDocVersion;
         if (currentDocVersion > 1) {
           versionBadge.textContent = 'v' + currentDocVersion;
           versionBadge.style.display = 'inline-flex';
@@ -891,7 +893,7 @@
           return;
         }
         versionPanelList.innerHTML = versions.map(v => {
-          const isCurrent = v.is_current || v.version === currentDocVersion;
+          const isCurrent = v.version === viewingVersion;
           const activeClass = isCurrent ? ' active' : '';
           const date = new Date(v.created_at + 'Z').toLocaleString('zh-CN');
           const currentLabel = isCurrent ? '<span class="version-panel-item-current">当前</span>' : '';
@@ -910,6 +912,8 @@
             if (isCurrent) {
               // Reload current version
               loadDocument();
+              viewingVersion = currentDocVersion;
+              versionBadge.textContent = 'v' + currentDocVersion;
               versionPanel.classList.remove('active');
               return;
             }
@@ -924,6 +928,8 @@
               document.title = data.original_name + ' (v' + version + ') - MD Viewer';
               document.getElementById('docTitle').textContent = data.original_name + ' (v' + version + ')';
               document.getElementById('content').innerHTML = data.html;
+              viewingVersion = version;
+              versionBadge.textContent = 'v' + version;
               versionPanel.classList.remove('active');
               // Scroll to top
               window.scrollTo(0, 0);
