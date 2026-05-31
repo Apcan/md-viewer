@@ -11,7 +11,6 @@ RUN npm config set registry https://registry.npmmirror.com && npm install --omit
 # Copy source code
 COPY src/ ./src/
 COPY public/ ./public/
-COPY migrate-v2.sql ./
 
 # Create data directory structure
 RUN mkdir -p /app/data/db /app/data/md /app/data/config
