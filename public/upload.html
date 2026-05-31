@@ -193,6 +193,90 @@
     .back-link:hover {
       color: var(--accent);
     }
+
+    /* --- Duplicate modal --- */
+    .dup-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+    }
+    .dup-modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+    .dup-modal {
+      background: var(--bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      width: 90%;
+      max-width: 420px;
+      padding: 24px;
+      transform: scale(0.95);
+      transition: transform 0.2s;
+    }
+    .dup-modal-overlay.active .dup-modal {
+      transform: scale(1);
+    }
+    .dup-modal h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+    .dup-modal p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+    .dup-modal-info {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+    .dup-modal-info strong {
+      color: var(--text);
+    }
+    .dup-modal-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .dup-modal-actions button {
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    .dup-modal-actions button:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .dup-modal-actions button.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .dup-modal-actions button.primary:hover {
+      background: var(--accent-hover);
+    }
     .navbar {
       position: absolute;
       top: 0;
@@ -304,6 +388,19 @@
 
   <a href="/" class="back-link">返回文档列表</a>
 
+  <!-- Duplicate document modal -->
+  <div class="dup-modal-overlay" id="dupModal">
+    <div class="dup-modal">
+      <h3>⚠️ 发现同名文档</h3>
+      <p>已存在同名文档，你想如何处理？</p>
+      <div class="dup-modal-info" id="dupDocInfo"></div>
+      <div class="dup-modal-actions">
+        <button id="dupNewBtn">新建文档</button>
+        <button class="primary" id="dupUpdateBtn">更新文档</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // --- Theme ---
     const html = document.documentElement;
@@ -343,6 +440,13 @@
     const categorySelect = document.getElementById('categorySelect');
     const permPasswordWrap = document.getElementById('permPasswordWrap');
     const viewPassword = document.getElementById('viewPassword');
+    const dupModal = document.getElementById('dupModal');
+    const dupDocInfo = document.getElementById('dupDocInfo');
+    const dupNewBtn = document.getElementById('dupNewBtn');
+    const dupUpdateBtn = document.getElementById('dupUpdateBtn');
+
+    let pendingFile = null;
+    let pendingDuplicateDoc = null;
 
     // Permission radio change: show/hide password input
     document.querySelectorAll('input[name="viewPermission"]').forEach(radio => {
@@ -351,12 +455,7 @@
       });
     });
 
-    async function uploadFile(file) {
-      if (!file.name.endsWith('.md')) {
-        result.className = 'result-card error';
-        result.textContent = '只支持 .md 文件';
-        return;
-      }
+    async function doUpload(file, replaceDocumentId) {
       const formData = new FormData();
       formData.append('file', file);
       const catId = categorySelect.value;
@@ -371,6 +470,10 @@
         formData.append('view_password', viewPassword.value.trim());
       }
 
+      if (replaceDocumentId) {
+        formData.append('replace_document_id', replaceDocumentId);
+      }
+
       result.className = 'result-card';
       result.textContent = '上传中...';
       result.style.display = 'block';
@@ -382,7 +485,8 @@
         const data = await res.json();
         if (data.success) {
           result.className = 'result-card success';
-          result.innerHTML = `上传成功！<br>文件: ${escapeHtml(data.filename)}<br>大小: ${formatSize(data.size)}<br><br><a href="/view/${data.id}" target="_blank">点击查看</a>`;
+          const updateInfo = data.updated ? '<br>✅ 已更新为 v' + data.version : '';
+          result.innerHTML = `上传成功！${updateInfo}<br>文件: ${escapeHtml(data.filename)}<br>大小: ${formatSize(data.size)}<br><br><a href="/view/${data.id}" target="_blank">点击查看</a>`;
           fileInput.value = '';
         } else {
           result.className = 'result-card error';
@@ -393,6 +497,61 @@
         result.textContent = '上传失败: ' + err.message;
       }
     }
+
+    async function uploadFile(file) {
+      if (!file.name.endsWith('.md')) {
+        result.className = 'result-card error';
+        result.textContent = '只支持 .md 文件';
+        return;
+      }
+
+      // Check for duplicate
+      try {
+        const res = await fetch('/api/check-duplicate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ original_name: file.name })
+        });
+        const data = await res.json();
+        if (data.exists && data.document) {
+          // Show duplicate modal
+          pendingFile = file;
+          pendingDuplicateDoc = data.document;
+          const docVersion = data.document.version || 1;
+          const docDate = new Date(data.document.created_at + 'Z').toLocaleString('zh-CN');
+          dupDocInfo.innerHTML = '<strong>' + escapeHtml(data.document.original_name) + '</strong><br>当前版本: v' + docVersion + '<br>创建时间: ' + docDate;
+          dupModal.classList.add('active');
+          return;
+        }
+      } catch (e) {
+        // If check fails, proceed with normal upload
+      }
+
+      doUpload(file, null);
+    }
+
+    // Duplicate modal buttons
+    dupNewBtn.addEventListener('click', () => {
+      dupModal.classList.remove('active');
+      if (pendingFile) {
+        doUpload(pendingFile, null);
+        pendingFile = null;
+        pendingDuplicateDoc = null;
+      }
+    });
+
+    dupUpdateBtn.addEventListener('click', () => {
+      dupModal.classList.remove('active');
+      if (pendingFile && pendingDuplicateDoc) {
+        doUpload(pendingFile, pendingDuplicateDoc.id);
+        pendingFile = null;
+        pendingDuplicateDoc = null;
+      }
+    });
+
+    dupModal.addEventListener('click', (e) => {
+      if (e.target === dupModal) dupModal.classList.remove('active');
+    });
 
     function formatSize(b) {
       if (b < 1024) return b + ' B';

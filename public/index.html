@@ -1134,6 +1134,21 @@
     .doc-card-name-input:focus {
       border-bottom-color: var(--accent-hover);
     }
+
+    /* --- Version badge --- */
+    .doc-card-version {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 600;
+      background: oklch(0.55 0.2 265 / 0.1);
+      color: var(--accent);
+      flex-shrink: 0;
+      white-space: nowrap;
+      line-height: 1.6;
+    }
   </style>
 </head>
 <body>
@@ -1413,10 +1428,12 @@
               ).join('') + '</div>'
             : '';
           const meta = '<div class="doc-card-meta">' + (doc.word_count || 0) + ' 字 · 约 ' + (doc.reading_time || 1) + ' 分钟</div>';
+          const versionBadge = (doc.version && doc.version > 1) ? '<span class="doc-card-version">v' + doc.version + '</span>' : '';
           return '<div class="doc-card" draggable="' + (!searchQuery) + '" data-id="' + doc.id + '">' +
             '<div class="doc-card-header">' +
             '<button class="doc-card-star' + starClass + '" onclick="toggleStar(\'' + doc.id + '\', this)" title="收藏">' + starChar + '</button>' +
             '<div class="doc-card-name" data-doc-id="' + doc.id + '">' + escapeHtml(doc.original_name) + '</div>' +
+            versionBadge +
             '<button class="doc-card-copy" onclick="copyLink(\'' + doc.id + '\', this)" title="复制链接">🔗</button>' +
             '</div>' +
             desc +

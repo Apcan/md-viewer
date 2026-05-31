@@ -103,6 +103,24 @@ db.exec(`
   )
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS document_versions (
+    id TEXT PRIMARY KEY,
+    document_id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    file_path TEXT NOT NULL,
+    file_size INTEGER,
+    filename TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+  )
+`);
+
+// --- Migration: add version column to documents ---
+if (!columnExists('documents', 'version')) {
+  db.exec(`ALTER TABLE documents ADD COLUMN version INTEGER DEFAULT 1`);
+}
+
 // --- 默认"未分类"分类 ---
 const defaultCat = db.prepare('SELECT id FROM categories WHERE name = ?').get('未分类');
 if (!defaultCat) {
@@ -137,7 +155,7 @@ const SESSION_SECRET = process.env.SESSION_SECRET || 'md-viewer-session-secret';
 // Public route prefix whitelist (no auth required)
 const PUBLIC_PREFIXES = ['/login', '/upload', '/view/', '/api/upload', '/api/categories', '/api/recent-views', '/api/document-counts', '/mcp'];
 // Exact public paths
-const PUBLIC_EXACT = ['/login', '/upload', '/api/auth/status', '/api/recent-views', '/api/document-counts', '/mcp'];
+const PUBLIC_EXACT = ['/login', '/upload', '/api/auth/status', '/api/recent-views', '/api/document-counts', '/mcp', '/api/check-duplicate'];
 // Static asset extensions — always public
 const PUBLIC_EXTENSIONS = ['.html', '.js', '.css', '.png', '.jpg', '.svg', '.ico'];
 
@@ -253,6 +271,46 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
+    const replaceDocumentId = req.body.replace_document_id || null;
+
+    // If replacing an existing document
+    if (replaceDocumentId) {
+      const existingDoc = db.prepare('SELECT * FROM documents WHERE id = ?').get(replaceDocumentId);
+      if (!existingDoc) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+
+      const newVersion = (existingDoc.version || 1) + 1;
+
+      // Save current version to document_versions
+      const versionId = uuidv4();
+      db.prepare(`
+        INSERT INTO document_versions (id, document_id, version, file_path, file_size, filename, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `).run(versionId, replaceDocumentId, existingDoc.version || 1, existingDoc.file_path, existingDoc.file_size, existingDoc.filename);
+
+      // Delete old file
+      if (fs.existsSync(existingDoc.file_path)) {
+        fs.unlinkSync(existingDoc.file_path);
+      }
+
+      // Update document with new file info
+      db.prepare(`
+        UPDATE documents SET file_path = ?, file_size = ?, filename = ?, version = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(req.file.path, req.file.size, req.file.filename, newVersion, replaceDocumentId);
+
+      return res.json({
+        success: true,
+        id: replaceDocumentId,
+        filename: req.file.originalname,
+        size: req.file.size,
+        version: newVersion,
+        updated: true
+      });
+    }
+
+    // New document creation
     const id = uuidv4();
     const categoryId = req.body.category_id || null;
     const viewPermission = req.body.view_permission || 'public';
@@ -284,6 +342,120 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
     });
   } catch (error) {
     console.error('Upload error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: Check duplicate document by original_name
+app.post('/api/check-duplicate', (req, res) => {
+  try {
+    const { original_name } = req.body;
+    if (!original_name) {
+      return res.json({ exists: false });
+    }
+    const doc = db.prepare('SELECT id, original_name, version, created_at FROM documents WHERE original_name = ?').get(original_name);
+    if (doc) {
+      return res.json({ exists: true, document: doc });
+    }
+    return res.json({ exists: false });
+  } catch (error) {
+    console.error('Check duplicate error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: Get version history of a document
+app.get('/api/documents/:id/versions', (req, res) => {
+  try {
+    const doc = db.prepare('SELECT id, version, created_at FROM documents WHERE id = ?').get(req.params.id);
+    if (!doc) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    const versions = db.prepare(`
+      SELECT id, version, file_size, filename, created_at
+      FROM document_versions
+      WHERE document_id = ?
+      ORDER BY version DESC
+    `).all(req.params.id);
+
+    // Add current version
+    const currentVersion = {
+      id: doc.id,
+      version: doc.version || 1,
+      file_size: null,
+      filename: null,
+      created_at: doc.created_at,
+      is_current: true
+    };
+
+    return res.json([currentVersion, ...versions]);
+  } catch (error) {
+    console.error('Get versions error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: Get specific version content
+app.get('/api/documents/:id/versions/:version', (req, res) => {
+  try {
+    const versionNum = parseInt(req.params.version, 10);
+    if (isNaN(versionNum)) {
+      return res.status(400).json({ error: 'Invalid version number' });
+    }
+
+    const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
+    if (!doc) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    // Current version
+    if (versionNum === (doc.version || 1)) {
+      const content = fs.readFileSync(doc.file_path, 'utf-8');
+      const html = marked(content);
+      const word_count = countWords(content);
+      const reading_time = Math.ceil(word_count / 400);
+      const { view_password, ...docWithoutPassword } = doc;
+      return res.json({
+        ...docWithoutPassword,
+        content,
+        html,
+        word_count,
+        reading_time
+      });
+    }
+
+    // Historical version
+    const versionRecord = db.prepare(
+      'SELECT * FROM document_versions WHERE document_id = ? AND version = ?'
+    ).get(req.params.id, versionNum);
+
+    if (!versionRecord) {
+      return res.status(404).json({ error: 'Version not found' });
+    }
+
+    if (!fs.existsSync(versionRecord.file_path)) {
+      return res.status(404).json({ error: 'Version file not found on disk' });
+    }
+
+    const content = fs.readFileSync(versionRecord.file_path, 'utf-8');
+    const html = marked(content);
+    const word_count = countWords(content);
+    const reading_time = Math.ceil(word_count / 400);
+
+    return res.json({
+      id: doc.id,
+      original_name: doc.original_name,
+      version: versionRecord.version,
+      file_size: versionRecord.file_size,
+      created_at: versionRecord.created_at,
+      content,
+      html,
+      word_count,
+      reading_time
+    });
+  } catch (error) {
+    console.error('Get version content error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -592,13 +764,22 @@ app.delete('/api/documents/:id', (req, res) => {
       return res.status(404).json({ error: 'Document not found' });
     }
 
-    // Delete file
+    // Delete version files
+    const versions = db.prepare('SELECT file_path FROM document_versions WHERE document_id = ?').all(req.params.id);
+    for (const v of versions) {
+      if (v.file_path && fs.existsSync(v.file_path)) {
+        fs.unlinkSync(v.file_path);
+      }
+    }
+
+    // Delete current file
     if (fs.existsSync(doc.file_path)) {
       fs.unlinkSync(doc.file_path);
     }
 
-    // Delete from database (cascade document_tags)
+    // Delete from database (cascade document_tags, document_versions)
     db.prepare('DELETE FROM document_tags WHERE document_id = ?').run(req.params.id);
+    db.prepare('DELETE FROM document_versions WHERE document_id = ?').run(req.params.id);
     const deleteStmt = db.prepare('DELETE FROM documents WHERE id = ?');
     deleteStmt.run(req.params.id);
 
@@ -904,13 +1085,14 @@ app.post('/mcp', (req, res) => {
             },
             {
               name: 'create_document',
-              description: 'Create a new document by uploading markdown content',
+              description: 'Create a new document by uploading markdown content. Optionally replace an existing document.',
               inputSchema: {
                 type: 'object',
                 properties: {
                   filename: { type: 'string', description: 'Filename (must end with .md)' },
                   content: { type: 'string', description: 'Markdown content' },
-                  category_id: { type: 'string', description: 'Category ID (optional)' }
+                  category_id: { type: 'string', description: 'Category ID (optional)' },
+                  replace_document_id: { type: 'string', description: 'Document ID to replace (optional). If provided, saves current version to history and updates the document.' }
                 },
                 required: ['filename', 'content']
               }
@@ -1006,6 +1188,29 @@ app.post('/mcp', (req, res) => {
                 },
                 required: ['ordered_ids']
               }
+            },
+            {
+              name: 'get_document_versions',
+              description: 'Get version history of a document',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string', description: 'Document ID' }
+                },
+                required: ['id']
+              }
+            },
+            {
+              name: 'get_document_version',
+              description: 'Get content of a specific document version',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string', description: 'Document ID' },
+                  version: { type: 'number', description: 'Version number' }
+                },
+                required: ['id', 'version']
+              }
             }
           ]
         }
@@ -1091,7 +1296,7 @@ app.post('/mcp', (req, res) => {
         }
 
         case 'create_document': {
-          const { filename, content, category_id } = args || {};
+          const { filename, content, category_id, replace_document_id } = args || {};
           if (!filename || !content) {
             return res.json({ jsonrpc: '2.0', id, error: { code: -32602, message: 'filename and content are required' } });
           }
@@ -1099,11 +1304,35 @@ app.post('/mcp', (req, res) => {
           const safeFilename = `${timestamp}_${uuidv4().slice(0, 8)}_${filename}`;
           const filePath = path.join(MD_DIR, safeFilename);
           fs.writeFileSync(filePath, content, 'utf-8');
-          const docId = uuidv4();
-          db.prepare(
-            'INSERT INTO documents (id, filename, original_name, file_path, file_size, category_id) VALUES (?, ?, ?, ?, ?, ?)'
-          ).run(docId, safeFilename, filename, filePath, Buffer.byteLength(content), category_id || null);
-          result = { content: [{ type: 'text', text: JSON.stringify({ success: true, id: docId, filename }, null, 2) }] };
+
+          // Replace existing document
+          if (replace_document_id) {
+            const existingDoc = db.prepare('SELECT * FROM documents WHERE id = ?').get(replace_document_id);
+            if (!existingDoc) {
+              return res.json({ jsonrpc: '2.0', id, error: { code: -32000, message: 'Document not found' } });
+            }
+            const newVersion = (existingDoc.version || 1) + 1;
+            // Save current version to history
+            const versionId = uuidv4();
+            db.prepare(`
+              INSERT INTO document_versions (id, document_id, version, file_path, file_size, filename, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            `).run(versionId, replace_document_id, existingDoc.version || 1, existingDoc.file_path, existingDoc.file_size, existingDoc.filename);
+            // Delete old file
+            if (fs.existsSync(existingDoc.file_path)) fs.unlinkSync(existingDoc.file_path);
+            // Update document
+            db.prepare(`
+              UPDATE documents SET file_path = ?, file_size = ?, filename = ?, version = ?, updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).run(filePath, Buffer.byteLength(content), safeFilename, newVersion, replace_document_id);
+            result = { content: [{ type: 'text', text: JSON.stringify({ success: true, id: replace_document_id, filename, version: newVersion, updated: true }, null, 2) }] };
+          } else {
+            const docId = uuidv4();
+            db.prepare(
+              'INSERT INTO documents (id, filename, original_name, file_path, file_size, category_id) VALUES (?, ?, ?, ?, ?, ?)'
+            ).run(docId, safeFilename, filename, filePath, Buffer.byteLength(content), category_id || null);
+            result = { content: [{ type: 'text', text: JSON.stringify({ success: true, id: docId, filename }, null, 2) }] };
+          }
           break;
         }
 
@@ -1216,6 +1445,58 @@ app.post('/mcp', (req, res) => {
           });
           sortBatch(ordered_ids);
           result = { content: [{ type: 'text', text: JSON.stringify({ success: true, updated: ordered_ids.length }, null, 2) }] };
+          break;
+        }
+
+        case 'get_document_versions': {
+          const doc = db.prepare('SELECT id, version, created_at FROM documents WHERE id = ?').get(args.id);
+          if (!doc) {
+            return res.json({ jsonrpc: '2.0', id, error: { code: -32000, message: 'Document not found' } });
+          }
+          const versions = db.prepare(`
+            SELECT id, version, file_size, filename, created_at
+            FROM document_versions
+            WHERE document_id = ?
+            ORDER BY version DESC
+          `).all(args.id);
+          const currentVersion = {
+            id: doc.id,
+            version: doc.version || 1,
+            file_size: null,
+            filename: null,
+            created_at: doc.created_at,
+            is_current: true
+          };
+          result = { content: [{ type: 'text', text: JSON.stringify([currentVersion, ...versions], null, 2) }] };
+          break;
+        }
+
+        case 'get_document_version': {
+          const versionNum = parseInt(args.version, 10);
+          if (isNaN(versionNum)) {
+            return res.json({ jsonrpc: '2.0', id, error: { code: -32602, message: 'Invalid version number' } });
+          }
+          const versionDoc = db.prepare('SELECT * FROM documents WHERE id = ?').get(args.id);
+          if (!versionDoc) {
+            return res.json({ jsonrpc: '2.0', id, error: { code: -32000, message: 'Document not found' } });
+          }
+          if (versionNum === (versionDoc.version || 1)) {
+            const vContent = fs.readFileSync(versionDoc.file_path, 'utf-8');
+            const vHtml = marked(vContent);
+            const { view_password: _, ...vDocNoPwd } = versionDoc;
+            result = { content: [{ type: 'text', text: JSON.stringify({ ...vDocNoPwd, content: vContent, html: vHtml }, null, 2) }] };
+          } else {
+            const versionRecord = db.prepare('SELECT * FROM document_versions WHERE document_id = ? AND version = ?').get(args.id, versionNum);
+            if (!versionRecord) {
+              return res.json({ jsonrpc: '2.0', id, error: { code: -32000, message: 'Version not found' } });
+            }
+            if (!fs.existsSync(versionRecord.file_path)) {
+              return res.json({ jsonrpc: '2.0', id, error: { code: -32000, message: 'Version file not found on disk' } });
+            }
+            const vContent = fs.readFileSync(versionRecord.file_path, 'utf-8');
+            const vHtml = marked(vContent);
+            result = { content: [{ type: 'text', text: JSON.stringify({ id: versionDoc.id, original_name: versionDoc.original_name, version: versionRecord.version, file_size: versionRecord.file_size, created_at: versionRecord.created_at, content: vContent, html: vHtml }, null, 2) }] };
+          }
           break;
         }
 

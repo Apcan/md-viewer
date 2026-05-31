@@ -395,6 +395,136 @@
     /* --- Header toolbar buttons --- */
     .header-actions .icon-btn { font-size: 15px; }
 
+    /* --- Version badge --- */
+    .version-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      background: oklch(0.55 0.2 265 / 0.1);
+      color: var(--accent);
+      cursor: pointer;
+      transition: background 0.15s;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .version-badge:hover {
+      background: oklch(0.55 0.2 265 / 0.18);
+    }
+
+    /* --- Version history panel --- */
+    .version-panel-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 300;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+    }
+    .version-panel-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+    .version-panel {
+      background: var(--bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      width: 90%;
+      max-width: 480px;
+      max-height: 70vh;
+      display: flex;
+      flex-direction: column;
+      transform: scale(0.95);
+      transition: transform 0.2s;
+    }
+    .version-panel-overlay.active .version-panel {
+      transform: scale(1);
+    }
+    .version-panel-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .version-panel-header h3 {
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .version-panel-close {
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .version-panel-close:hover {
+      background: var(--bg-card);
+    }
+    .version-panel-list {
+      list-style: none;
+      overflow-y: auto;
+      flex: 1;
+      padding: 8px;
+    }
+    .version-panel-item {
+      display: flex;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background 0.15s;
+      gap: 10px;
+    }
+    .version-panel-item:hover {
+      background: var(--bg-card);
+    }
+    .version-panel-item.active {
+      background: oklch(0.55 0.2 265 / 0.08);
+      color: var(--accent);
+    }
+    .version-panel-item-version {
+      font-size: 13px;
+      font-weight: 600;
+      min-width: 32px;
+    }
+    .version-panel-item-info {
+      flex: 1;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .version-panel-item-info strong {
+      color: var(--text);
+      font-weight: 500;
+    }
+    .version-panel-item-current {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: oklch(0.65 0.17 155 / 0.1);
+      color: var(--success);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .version-panel-empty {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
     /* --- TOC sidebar --- */
     .toc-sidebar {
       position: fixed;
@@ -585,6 +715,7 @@
     <div class="header-content">
       <a href="/" class="back-btn">← 返回</a>
       <div class="doc-title" id="docTitle">加载中...</div>
+      <span class="version-badge" id="versionBadge" style="display:none" title="点击查看版本历史"></span>
       <div class="header-actions">
         <button class="icon-btn" id="exportHtmlBtn" title="导出 HTML">⬇</button>
         <button class="icon-btn" id="printBtn" title="打印">🖨</button>
@@ -642,6 +773,19 @@
     <img id="lightboxImg" src="" alt="">
   </div>
 
+  <!-- Version history panel -->
+  <div class="version-panel-overlay" id="versionPanel">
+    <div class="version-panel">
+      <div class="version-panel-header">
+        <h3>版本历史</h3>
+        <button class="version-panel-close" id="versionPanelClose">&times;</button>
+      </div>
+      <ul class="version-panel-list" id="versionPanelList">
+        <li class="version-panel-empty">加载中...</li>
+      </ul>
+    </div>
+  </div>
+
   <script>
     // --- Theme ---
     const html = document.documentElement;
@@ -664,6 +808,7 @@
 
     // --- Load document ---
     let currentDocId = null;
+    let currentDocVersion = 1;
 
     async function loadDocument(docPassword) {
       currentDocId = window.location.pathname.split('/').pop();
@@ -671,6 +816,7 @@
       const title = document.getElementById('docTitle');
       const header = document.getElementById('header');
       const passwordOverlay = document.getElementById('passwordOverlay');
+      const versionBadge = document.getElementById('versionBadge');
 
       const fromList = document.referrer &&
         document.referrer.includes(window.location.origin) &&
@@ -712,12 +858,91 @@
         title.textContent = data.original_name;
         content.classList.remove('sk-wrap');
         content.innerHTML = data.html;
+
+        // Show version badge
+        currentDocVersion = data.version || 1;
+        if (currentDocVersion > 1) {
+          versionBadge.textContent = 'v' + currentDocVersion;
+          versionBadge.style.display = 'inline-flex';
+        } else {
+          versionBadge.style.display = 'none';
+        }
       } catch (err) {
         content.innerHTML = '<div class="error">加载失败: ' + err.message + '</div>';
         title.textContent = '加载失败';
       }
     }
     loadDocument();
+
+    // --- Version history panel ---
+    const versionPanel = document.getElementById('versionPanel');
+    const versionPanelList = document.getElementById('versionPanelList');
+    const versionBadge = document.getElementById('versionBadge');
+
+    versionBadge.addEventListener('click', async () => {
+      if (!currentDocId) return;
+      versionPanelList.innerHTML = '<li class="version-panel-empty">加载中...</li>';
+      versionPanel.classList.add('active');
+      try {
+        const res = await fetch('/api/documents/' + currentDocId + '/versions');
+        const versions = await res.json();
+        if (!versions.length) {
+          versionPanelList.innerHTML = '<li class="version-panel-empty">暂无版本记录</li>';
+          return;
+        }
+        versionPanelList.innerHTML = versions.map(v => {
+          const isCurrent = v.is_current || v.version === currentDocVersion;
+          const activeClass = isCurrent ? ' active' : '';
+          const date = new Date(v.created_at + 'Z').toLocaleString('zh-CN');
+          const currentLabel = isCurrent ? '<span class="version-panel-item-current">当前</span>' : '';
+          const sizeInfo = v.file_size ? formatSize(v.file_size) : '';
+          return '<li class="version-panel-item' + activeClass + '" data-version="' + v.version + '" data-is-current="' + !!isCurrent + '">' +
+            '<span class="version-panel-item-version">v' + v.version + '</span>' +
+            '<span class="version-panel-item-info"><strong>' + date + '</strong>' + (sizeInfo ? ' · ' + sizeInfo : '') + '</span>' +
+            currentLabel +
+            '</li>';
+        }).join('');
+
+        versionPanelList.querySelectorAll('.version-panel-item').forEach(item => {
+          item.addEventListener('click', async () => {
+            const version = parseInt(item.dataset.version, 10);
+            const isCurrent = item.dataset.isCurrent === 'true';
+            if (isCurrent) {
+              // Reload current version
+              loadDocument();
+              versionPanel.classList.remove('active');
+              return;
+            }
+            // Load historical version
+            try {
+              const res = await fetch('/api/documents/' + currentDocId + '/versions/' + version);
+              const data = await res.json();
+              if (data.error) {
+                alert('加载失败: ' + data.error);
+                return;
+              }
+              document.title = data.original_name + ' (v' + version + ') - MD Viewer';
+              document.getElementById('docTitle').textContent = data.original_name + ' (v' + version + ')';
+              document.getElementById('content').innerHTML = data.html;
+              versionPanel.classList.remove('active');
+              // Scroll to top
+              window.scrollTo(0, 0);
+            } catch (err) {
+              alert('加载失败: ' + err.message);
+            }
+          });
+        });
+      } catch (err) {
+        versionPanelList.innerHTML = '<li class="version-panel-empty">加载失败</li>';
+      }
+    });
+
+    document.getElementById('versionPanelClose').addEventListener('click', () => {
+      versionPanel.classList.remove('active');
+    });
+    versionPanel.addEventListener('click', (e) => {
+      if (e.target === versionPanel) versionPanel.classList.remove('active');
+    });
 
     // --- Password form submit ---
     const passwordForm = document.getElementById('passwordForm');
@@ -908,6 +1133,11 @@
     langLabelObserver.observe(contentEl, { childList: true, subtree: true });
 
     function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+    function formatSize(b) {
+      if (b < 1024) return b + ' B';
+      if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+      return (b / 1048576).toFixed(1) + ' MB';
+    }
 
     // --- Reading progress bar ---
     const readingProgress = document.getElementById('readingProgress');
