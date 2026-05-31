@@ -182,7 +182,6 @@ const authMiddleware = (req, res, next) => {
   // Public prefix whitelist (GET only for categories, documents/:id)
   if (req.path === '/api/categories' && req.method === 'GET') return next();
   if (/^\/api\/documents\/[^/]+$/.test(req.path) && req.method === 'GET') return next();
-  if (/^\/api\/documents\/[^/]+\/versions(\/[^/]+)?$/.test(req.path) && req.method === 'GET') return next();
   if (PUBLIC_PREFIXES.some(p => req.path.startsWith(p))) return next();
 
   // Allow static files served by express.static (but they are handled above by extension check)
@@ -368,6 +367,22 @@ app.get('/api/documents/:id/versions', (req, res) => {
       return res.status(404).json({ error: 'Document not found' });
     }
 
+    // 权限检查
+    const fullDoc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
+    if (fullDoc.view_permission === 'private') {
+      if (!AUTH_PASSWORD || !(req.session && req.session.authenticated)) {
+        return res.status(401).json({ error: 'Authentication required', requireAuth: true });
+      }
+    } else if (fullDoc.view_permission === 'password') {
+      const isAuth = AUTH_PASSWORD && req.session && req.session.authenticated;
+      if (!isAuth) {
+        const viewPassword = req.headers['x-view-password'];
+        if (!viewPassword || !fullDoc.view_password || !verifyPassword(viewPassword, fullDoc.view_password)) {
+          return res.status(403).json({ error: 'Invalid password', requirePassword: true });
+        }
+      }
+    }
+
     const versions = db.prepare(`
       SELECT id, version, file_size, filename, created_at
       FROM document_versions
@@ -403,6 +418,21 @@ app.get('/api/documents/:id/versions/:version', (req, res) => {
     const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
     if (!doc) {
       return res.status(404).json({ error: 'Document not found' });
+    }
+
+    // 权限检查
+    if (doc.view_permission === 'private') {
+      if (!AUTH_PASSWORD || !(req.session && req.session.authenticated)) {
+        return res.status(401).json({ error: 'Authentication required', requireAuth: true });
+      }
+    } else if (doc.view_permission === 'password') {
+      const isAuth = AUTH_PASSWORD && req.session && req.session.authenticated;
+      if (!isAuth) {
+        const viewPassword = req.headers['x-view-password'];
+        if (!viewPassword || !doc.view_password || !verifyPassword(viewPassword, doc.view_password)) {
+          return res.status(403).json({ error: 'Invalid password', requirePassword: true });
+        }
+      }
     }
 
     // Current version
