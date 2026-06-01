@@ -14,14 +14,15 @@
   <link rel="stylesheet" href="/css/navbar.css">
   <link rel="stylesheet" href="/css/cards.css">
   <link rel="stylesheet" href="/css/modal.css">
+  <link rel="stylesheet" href="https://unpkg.com/@iconscout/unicons@latest/css/line.css">
 </head>
 <body>
   <nav class="navbar">
     <a href="/" class="navbar-brand">MD Viewer</a>
     <div class="navbar-actions">
-      <button class="icon-btn" id="themeToggle" title="切换主题"></button>
-      <a href="/upload" class="icon-btn icon-btn-link" title="上传">+</a>
-      <button class="icon-btn icon-btn-sm" id="logoutBtn" title="登出">⏻</button>
+      <button class="icon-btn" id="themeToggle" title="切换主题"><i class="uil uil-moon"></i></button>
+      <a href="/upload" class="icon-btn icon-btn-link" title="上传"><i class="uil uil-plus"></i></a>
+      <button class="icon-btn icon-btn-sm" id="logoutBtn" title="登出"><i class="uil uil-signout"></i></button>
     </div>
   </nav>
 
@@ -32,12 +33,12 @@
         <div class="tab-underline" id="tabUnderline"></div>
       </div>
       <div class="search-wrap">
-        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <i class="uil uil-search search-icon"></i>
         <input type="text" class="search-input" id="searchInput" placeholder="搜索文档...">
-        <button class="search-clear" id="searchClear">&times;</button>
+        <button class="search-clear" id="searchClear"><i class="uil uil-times"></i></button>
       </div>
       <div class="doc-count-bar" id="docCountBar"></div>
-      <button class="tag-mgmt-btn" id="tagMgmtBtn" title="管理标签">🏷</button>
+      <button class="tag-mgmt-btn" id="tagMgmtBtn" title="管理标签"><i class="uil uil-tag"></i></button>
     </div>
 
     <div class="tag-filter-bar" id="tagFilterBar"></div>
@@ -81,7 +82,7 @@
     <div class="modal">
       <div class="modal-header">
         <h3>编辑文档</h3>
-        <button class="modal-close" id="catSelectClose">&times;</button>
+        <button class="modal-close" id="catSelectClose"><i class="uil uil-times"></i></button>
       </div>
       <div class="modal-body">
         <div class="edit-modal-section-label">分类</div>
@@ -93,15 +94,15 @@
         <div class="permission-options">
           <label class="perm-option">
             <input type="radio" name="editPermRadio" value="public">
-            🌐 公开
+            <i class="uil uil-globe"></i> 公开
           </label>
           <label class="perm-option">
             <input type="radio" name="editPermRadio" value="private">
-            🔒 私有
+            <i class="uil uil-lock"></i> 私有
           </label>
           <label class="perm-option">
             <input type="radio" name="editPermRadio" value="password">
-            🔑 密码查看
+            <i class="uil uil-key"></i> 密码查看
           </label>
         </div>
         <div class="edit-modal-perm-wrap" id="editPermPasswordWrap">
@@ -128,7 +129,7 @@
     <div class="modal">
       <div class="modal-header">
         <h3>管理分类</h3>
-        <button class="modal-close" id="modalClose">&times;</button>
+        <button class="modal-close" id="modalClose"><i class="uil uil-times"></i></button>
       </div>
       <div class="modal-body">
         <div class="modal-add-row">
@@ -145,7 +146,7 @@
     <div class="modal">
       <div class="modal-header">
         <h3>管理标签</h3>
-        <button class="modal-close" id="tagModalClose">&times;</button>
+        <button class="modal-close" id="tagModalClose"><i class="uil uil-times"></i></button>
       </div>
       <div class="modal-body">
         <div class="modal-add-row">

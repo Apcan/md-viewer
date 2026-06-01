@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="/css/common.css">
   <link rel="stylesheet" href="/css/navbar.css">
   <link rel="stylesheet" href="/css/view.css">
+  <link rel="stylesheet" href="https://unpkg.com/@iconscout/unicons@latest/css/line.css">
   <style>
     body {
       min-height: 100vh;
@@ -671,21 +672,21 @@
 
   <div class="header" id="header">
     <div class="header-content">
-      <a href="/" class="back-btn">← 返回</a>
+      <a href="/" class="back-btn"><i class="uil uil-arrow-left"></i> 返回</a>
       <div class="doc-title" id="docTitle">加载中...</div>
       <span class="version-badge" id="versionBadge" style="display:none" title="点击查看版本历史"></span>
       <div class="header-actions">
-        <button class="icon-btn" id="exportHtmlBtn" title="导出 HTML">⬇</button>
-        <button class="icon-btn" id="printBtn" title="打印">🖨</button>
+        <button class="icon-btn" id="exportHtmlBtn" title="导出 HTML"><i class="uil uil-file-download"></i></button>
+        <button class="icon-btn" id="printBtn" title="打印"><i class="uil uil-print"></i></button>
       </div>
     </div>
   </div>
-  <button class="icon-btn theme-float" id="themeToggle" title="切换主题"></button>
+  <button class="icon-btn theme-float" id="themeToggle" title="切换主题"><i class="uil uil-moon"></i></button>
 
   <!-- Password overlay -->
   <div class="password-overlay hidden" id="passwordOverlay">
     <div class="password-card">
-      <div class="password-card-icon">🔑</div>
+      <div class="password-card-icon"><i class="uil uil-key-skeleton-alt"></i></div>
       <div class="password-card-title">此文档需要密码查看</div>
       <div class="password-card-hint">请输入查看密码以访问文档内容</div>
       <form id="passwordForm">
@@ -720,7 +721,7 @@
     <div class="toc-title">目录</div>
     <ul class="toc-list" id="tocList"></ul>
   </aside>
-  <button class="toc-mobile-toggle" id="tocMobileToggle">📑</button>
+  <button class="toc-mobile-toggle" id="tocMobileToggle"><i class="uil uil-list-ol"></i></button>
   <div class="toc-mobile-overlay" id="tocMobileOverlay"></div>
   <div class="toc-mobile-panel" id="tocMobilePanel">
     <ul class="toc-list" id="tocMobileList"></ul>
@@ -736,7 +737,7 @@
     <div class="version-panel">
       <div class="version-panel-header">
         <h3>版本历史</h3>
-        <button class="version-panel-close" id="versionPanelClose">&times;</button>
+        <button class="version-panel-close" id="versionPanelClose"><i class="uil uil-times"></i></button>
       </div>
       <ul class="version-panel-list" id="versionPanelList">
         <li class="version-panel-empty">加载中...</li>
